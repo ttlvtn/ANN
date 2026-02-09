@@ -1,84 +1,86 @@
 import streamlit as st
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 
-# 設定網頁標題
-st.set_page_config(page_title="ANN 運算邏輯視覺化", layout="wide")
-st.title("🧠 AI 的大腦是怎麼轉的？—— ANN 運算與物理類比")
+# 解決中文顯示問題 (針對 Windows/Mac 常用字體)
+plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Microsoft JhengHei', 'SimHei'] 
+plt.rcParams['axes.unicode_minus'] = False
 
-st.markdown("""
-### 💡 物理類比：水流系統
-想像神經網路是一個**水管系統**：
-* **輸入 (Input)**：水源的壓力（例如：讀書的時間）。
-* **權重 (Weight)**：水管轉接頭的**鬆緊度**。轉得越鬆，水流越大；轉得越緊，水流越小。
-* **偏置 (Bias)**：加壓幫浦，給水流一個基礎的推力。
-* **輸出 (Output)**：最後水桶裡裝了多少水（預測的分數）。
-""")
+st.set_page_config(page_title="多層 ANN 視覺化", layout="wide")
 
-# --- 側邊欄控制 ---
-st.sidebar.header("🛠️ 手動調整神經元")
-w = st.sidebar.slider("調整權重 (Weight)", -2.0, 2.0, 0.5)
-b = st.sidebar.slider("調整偏置 (Bias)", -5.0, 5.0, 0.0)
-target = st.sidebar.number_input("目標分數 (Target Score)", 0.0, 100.0, 80.0)
+st.title("🌊 為什麼神經網路可以『深』？—— 多層水管的比對邏輯")
 
-# --- 前向傳播計算 ---
-x = np.linspace(0, 10, 100)  # 假設讀書時間 0~10 小時
-z = w * x + b
-prediction = 1 / (1 + np.exp(-z)) * 100  # 使用 Sigmoid 將結果轉為 0~100 分
+# --- 物理含意導讀 ---
+with st.expander("📖 點開看：給高中生的物理類比"):
+    st.write("""
+    1. **前向傳播 = 水流方向**：水從第 1 層流到第 N 層，每一層的閥門（權重）都會影響最後流出的水量。
+    2. **損失函數 = 重力位能**：最後的水量與目標不符時，這份「誤差」就像位能，會產生一股推力。
+    3. **反向傳播 = 壓力回溯**：當最後一關出問題，壓力會「由後往前」推回每一層，告訴前面的閥門：『嘿！你剛才開太大了！』
+    4. **連鎖律 = 槓桿原理**：後面動一點，前面可能要動很多。連鎖律就是計算這個『聯動比例』。
+    """)
+
+# --- 側邊欄：多層控制 ---
+st.sidebar.header("🛠️ 調整多層閥門 (Weights)")
+st.sidebar.subheader("第一層 (基礎理解力)")
+w1 = st.sidebar.slider("閥門 W1 (對細節的吸收)", 0.0, 2.0, 0.8)
+st.sidebar.subheader("第二層 (邏輯整合力)")
+w2 = st.sidebar.slider("閥門 W2 (將細節轉為觀念)", 0.0, 2.0, 1.2)
+
+target_y = st.sidebar.number_input("🎯 目標學習成果 (0~1.0)", 0.0, 1.0, 0.9)
+
+# --- 模擬多層運算 ---
+# 假設輸入 x = 1.0 (一個單位的努力)
+x = 1.0
+hidden_layer = np.tanh(x * w1)  # 第一層輸出
+final_output = np.tanh(hidden_layer * w2)  # 第二層輸出 (最終結果)
 
 # --- 視覺化圖表 ---
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("📊 前向傳播：預測結果")
-    fig, ax = plt.subplots()
-    ax.plot(x, prediction, label="預測曲線", color="#1f77b4", linewidth=3)
-    ax.axhline(y=target, color='r', linestyle='--', label="目標分數")
-    ax.set_xlabel("讀書時間 (Input)")
-    ax.set_ylabel("預測分數 (Output)")
-    ax.legend()
+    st.subheader("💧 多層水管示意圖")
+    # 畫出簡單的神經網路架構圖
+    fig, ax = plt.subplots(figsize=(8, 4))
+    nodes = [0, 1, 2] # Input, Hidden, Output
+    y_pos = [0, 0, 0]
+    
+    # 節點
+    ax.scatter(nodes, y_pos, s=1000, c=['#87CEEB', '#4682B4', '#1E90FF'], zorder=3)
+    # 連線與權重標註
+    ax.annotate('', xy=(1, 0), xytext=(0, 0), arrowprops=dict(arrowstyle="->", lw=w1*5))
+    ax.annotate('', xy=(2, 0), xytext=(1, 0), arrowprops=dict(arrowstyle="->", lw=w2*5))
+    
+    ax.text(0, 0.1, "輸入 (努力)", ha='center')
+    ax.text(1, 0.1, f"中間層\n訊號:{hidden_layer:.2f}", ha='center')
+    ax.text(2, 0.1, f"輸出 (成果)\n{final_output:.2f}", ha='center')
+    ax.text(0.5, -0.1, f"權重 W1: {w1}", ha='center', color='red')
+    ax.text(1.5, -0.1, f"權重 W2: {w2}", ha='center', color='red')
+    
+    ax.set_ylim(-0.5, 0.5)
+    ax.axis('off')
     st.pyplot(fig)
 
 with col2:
-    st.subheader("📉 損失函數：物理上的「位能」")
-    # 這裡類比物理上的位能：距離目標越遠，位能（誤差）越高
-    w_range = np.linspace(-2, 2, 100)
-    # 簡化版損失函數 (L2 Loss)
-    loss = (target - (1 / (1 + np.exp(-(w_range * 5 + b))) * 100))**2
-    
-    fig2, ax2 = plt.subplots()
-    ax2.plot(w_range, loss, color="#ff7f0e")
-    # 標出當前權重的位置
-    current_loss = (target - (1 / (1 + np.exp(-(w * 5 + b))) * 100))**2
-    ax2.scatter([w], [current_loss], color='red', s=100, label="目前權重位置")
-    ax2.set_xlabel("權重 (水管鬆緊度)")
-    ax2.set_ylabel("誤差位能 (Loss)")
-    ax2.legend()
-    st.pyplot(fig2)
+    st.subheader("🎯 比對結果")
+    loss = 0.5 * (final_output - target_y)**2
+    st.metric("目前產出", f"{final_output:.2f}")
+    st.metric("誤差位能 (Loss)", f"{loss:.4f}", delta=f"{final_output - target_y:.2f}", delta_color="inverse")
 
-st.info(f"**目前狀態：** 當權重為 {w} 時，誤差位能為 {current_loss:.2f}。")
-
-# --- 背後邏輯解釋 ---
+# --- 反向傳播的視覺化解釋 ---
 st.divider()
-st.header("🔍 背後的運算邏輯")
+st.subheader("🧬 誤差是怎麼『比對』回去的？")
 
-col_a, col_b = st.columns(2)
-with col_a:
-    st.markdown("""
-    #### 1. 前向傳播 (Forward Pass)
-    這就像水從水源流向水桶。
-    $$ \text{Output} = \sigma(\text{Input} \cdot W + b) $$
-    我們把讀書時間乘以**權重**，加上**偏置**，再透過一個轉換函數，得到最後的分數。
-    """)
-    
-with col_b:
-    st.markdown("""
-    #### 2. 反向傳播 (Backpropagation)
-    當我們發現預測分數跟目標不一樣時，我們會**倒著走回去**。
-    在物理上，這就像是**球往低處滾**：
-    * 計算**梯度 (Gradient)**：看哪邊比較陡。
-    * **更新權重**：往坡度低的方向轉動水管轉接頭。
-    """)
+# 計算梯度 (簡化版：使用 tanh 的導數 1-tanh^2)
+grad_w2 = (final_output - target_y) * (1 - final_output**2) * hidden_layer
+grad_w1 = (final_output - target_y) * (1 - final_output**2) * w2 * (1 - hidden_layer**2) * x
 
-st.success("試著滑動左側的權重，看看右圖紅點（你的權重）是如何在『誤差山谷』中移動的！")
+c1, c2 = st.columns(2)
+with c1:
+    st.info(f"**後層比對 (W2 的責任)：**\n\n直接看輸出差多少。梯度 = {grad_w2:.4f}")
+    st.write("物理意義：這節水管離出口最近，修正最直接。")
+
+with c2:
+    st.info(f"**前層比對 (W1 的責任)：**\n\n透過 W2 傳回來的壓力。梯度 = {grad_w1:.4f}")
+    st.write("物理意義：這節水管要修正，得考慮後面 W2 是開還是關。")
+
+st.warning(f"💡 **下一步動作：** 為了降低誤差，W1 應該 {'調大' if grad_w1 < 0 else '調小'}，W2 應該 {'調大' if grad_w2 < 0 else '調小'}。")
