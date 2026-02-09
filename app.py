@@ -1,86 +1,70 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.graph_objects as go
 
-# 解決中文顯示問題 (針對 Windows/Mac 常用字體)
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Microsoft JhengHei', 'SimHei'] 
-plt.rcParams['axes.unicode_minus'] = False
+st.set_page_config(page_title="ANN 多層原理視覺化", layout="wide")
 
-st.set_page_config(page_title="多層 ANN 視覺化", layout="wide")
+st.title("🌊 多層神經網路：物理上的『連鎖壓力』")
 
-st.title("🌊 為什麼神經網路可以『深』？—— 多層水管的比對邏輯")
+# --- 側邊欄：參數調整 ---
+st.sidebar.header("🛠️ 調整水流閥門 (權重)")
+w1 = st.sidebar.slider("第一層閥門 W1 (輸入能量放大率)", 0.0, 5.0, 1.5)
+w2 = st.sidebar.slider("第二層閥門 W2 (中間能量轉化率)", 0.0, 5.0, 0.8)
+target = st.sidebar.slider("🎯 目標水量 (正確答案)", 0.0, 1.0, 0.9)
 
-# --- 物理含意導讀 ---
-with st.expander("📖 點開看：給高中生的物理類比"):
-    st.write("""
-    1. **前向傳播 = 水流方向**：水從第 1 層流到第 N 層，每一層的閥門（權重）都會影響最後流出的水量。
-    2. **損失函數 = 重力位能**：最後的水量與目標不符時，這份「誤差」就像位能，會產生一股推力。
-    3. **反向傳播 = 壓力回溯**：當最後一關出問題，壓力會「由後往前」推回每一層，告訴前面的閥門：『嘿！你剛才開太大了！』
-    4. **連鎖律 = 槓桿原理**：後面動一點，前面可能要動很多。連鎖律就是計算這個『聯動比例』。
-    """)
+# --- 計算邏輯 (物理公式) ---
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
 
-# --- 側邊欄：多層控制 ---
-st.sidebar.header("🛠️ 調整多層閥門 (Weights)")
-st.sidebar.subheader("第一層 (基礎理解力)")
-w1 = st.sidebar.slider("閥門 W1 (對細節的吸收)", 0.0, 2.0, 0.8)
-st.sidebar.subheader("第二層 (邏輯整合力)")
-w2 = st.sidebar.slider("閥門 W2 (將細節轉為觀念)", 0.0, 2.0, 1.2)
+# 前向傳播 (Forward Pass)
+input_val = 1.0 # 假設輸入一個單位的努力
+hidden_out = sigmoid(input_val * w1)
+final_out = sigmoid(hidden_out * w2)
 
-target_y = st.sidebar.number_input("🎯 目標學習成果 (0~1.0)", 0.0, 1.0, 0.9)
-
-# --- 模擬多層運算 ---
-# 假設輸入 x = 1.0 (一個單位的努力)
-x = 1.0
-hidden_layer = np.tanh(x * w1)  # 第一層輸出
-final_output = np.tanh(hidden_layer * w2)  # 第二層輸出 (最終結果)
-
-# --- 視覺化圖表 ---
+# --- 視覺化呈現 (改用 Plotly 避免中文亂碼) ---
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("💧 多層水管示意圖")
-    # 畫出簡單的神經網路架構圖
-    fig, ax = plt.subplots(figsize=(8, 4))
-    nodes = [0, 1, 2] # Input, Hidden, Output
-    y_pos = [0, 0, 0]
+    st.subheader("💧 能量流動圖")
+    fig = go.Figure()
+    # 畫節點與連線
+    fig.add_trace(go.Scatter(x=[0, 1, 2], y=[0, 0, 0], mode='markers+text',
+                             marker=dict(size=[40, 60, 80], color=['#AEEEEE', '#5CACEE', '#1874CD']),
+                             text=["輸入", "隱藏層", "輸出"], textposition="top center"))
+    # 畫水管 (權重)
+    fig.add_annotation(x=0.5, y=0.05, text=f"W1={w1}", showarrow=False)
+    fig.add_annotation(x=1.5, y=0.05, text=f"W2={w2}", showarrow=False)
     
-    # 節點
-    ax.scatter(nodes, y_pos, s=1000, c=['#87CEEB', '#4682B4', '#1E90FF'], zorder=3)
-    # 連線與權重標註
-    ax.annotate('', xy=(1, 0), xytext=(0, 0), arrowprops=dict(arrowstyle="->", lw=w1*5))
-    ax.annotate('', xy=(2, 0), xytext=(1, 0), arrowprops=dict(arrowstyle="->", lw=w2*5))
-    
-    ax.text(0, 0.1, "輸入 (努力)", ha='center')
-    ax.text(1, 0.1, f"中間層\n訊號:{hidden_layer:.2f}", ha='center')
-    ax.text(2, 0.1, f"輸出 (成果)\n{final_output:.2f}", ha='center')
-    ax.text(0.5, -0.1, f"權重 W1: {w1}", ha='center', color='red')
-    ax.text(1.5, -0.1, f"權重 W2: {w2}", ha='center', color='red')
-    
-    ax.set_ylim(-0.5, 0.5)
-    ax.axis('off')
-    st.pyplot(fig)
+    fig.update_layout(height=300, showlegend=False, yaxis=dict(visible=False), xaxis=dict(visible=False))
+    st.plotly_chart(fig, use_container_width=True)
 
 with col2:
-    st.subheader("🎯 比對結果")
-    loss = 0.5 * (final_output - target_y)**2
-    st.metric("目前產出", f"{final_output:.2f}")
-    st.metric("誤差位能 (Loss)", f"{loss:.4f}", delta=f"{final_output - target_y:.2f}", delta_color="inverse")
+    st.subheader("⚖️ 誤差比對")
+    error = final_out - target
+    loss = 0.5 * (error**2)
+    st.metric("最終水量", f"{final_out:.2f}")
+    st.metric("誤差 (Loss)", f"{loss:.4f}", delta=f"{error:.2f}", delta_color="inverse")
 
-# --- 反向傳播的視覺化解釋 ---
+# --- 核心邏輯：反向傳播 (物理含意) ---
 st.divider()
-st.subheader("🧬 誤差是怎麼『比對』回去的？")
+st.header("🧬 為什麼後面的錯，要前面的人負責？")
 
-# 計算梯度 (簡化版：使用 tanh 的導數 1-tanh^2)
-grad_w2 = (final_output - target_y) * (1 - final_output**2) * hidden_layer
-grad_w1 = (final_output - target_y) * (1 - final_output**2) * w2 * (1 - hidden_layer**2) * x
+# 計算梯度 (連鎖律)
+# dLoss/dw2 = (y-t) * y(1-y) * h
+grad_w2 = error * (final_out * (1 - final_out)) * hidden_out
+# dLoss/dw1 = (y-t) * y(1-y) * w2 * h(1-h) * x
+grad_w1 = error * (final_out * (1 - final_out)) * w2 * (hidden_out * (1 - hidden_out)) * input_val
 
 c1, c2 = st.columns(2)
 with c1:
-    st.info(f"**後層比對 (W2 的責任)：**\n\n直接看輸出差多少。梯度 = {grad_w2:.4f}")
-    st.write("物理意義：這節水管離出口最近，修正最直接。")
+    st.write("### 📍 後層 (W2) 的責任")
+    st.write(f"當前壓力回傳值：**{grad_w2:.4f}**")
+    st.markdown("> **物理含意**：這就像是在水管末端。如果水太多，末端閥門直接關小一點最有效。")
 
 with c2:
-    st.info(f"**前層比對 (W1 的責任)：**\n\n透過 W2 傳回來的壓力。梯度 = {grad_w1:.4f}")
-    st.write("物理意義：這節水管要修正，得考慮後面 W2 是開還是關。")
+    st.write("### 📍 前層 (W1) 的責任")
+    st.write(f"當前壓力回傳值：**{grad_w1:.4f}**")
+    st.markdown(f"> **物理含意**：這節水管要動多少，取決於 W2 傳回來的『指令』。如果 W2 關得很死，前面動再多也沒用。這就是**連鎖律**的體現！")
 
-st.warning(f"💡 **下一步動作：** 為了降低誤差，W1 應該 {'調大' if grad_w1 < 0 else '調小'}，W2 應該 {'調大' if grad_w2 < 0 else '調小'}。")
+st.info(f"💡 **AI 學習指令**：系統現在會命令 W1 {'調小' if grad_w1 > 0 else '調大'}，且命令 W2 {'調小' if grad_w2 > 0 else '調大'}。")
