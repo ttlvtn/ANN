@@ -67,20 +67,20 @@ with col2:
     st.metric("Final Loss", f"{loss_current:.4f}")
     
     # 解釋 x 的影響
-    st.write("---")
-    st.write("**$x$ (Input) 的角色：**")
-    if abs(user_input) > 1:
-        st.write(f"現在 $x={user_input}$，這會**放大** Weight 的影響力，讓 Loss 曲線變得更陡峭。")
-    else:
-        st.write(f"現在 $x={user_input}$ 較小，這會**縮小** Weight 的影響力，讓 Loss 曲線變得平緩。")
+    # st.write("---")
+    # st.write("**$x$ (Input) 的角色：**")
+    # if abs(user_input) > 1:
+    #     st.write(f"現在 $x={user_input}$，這會**放大** Weight 的影響力，讓 Loss 曲線變得更陡峭。")
+    # else:
+    #     st.write(f"現在 $x={user_input}$ 較小，這會**縮小** Weight 的影響力，讓 Loss 曲線變得平緩。")
 
 # --- 6. 互動總結 ---
 st.divider()
 st.subheader("📝 觀察重點：$x$ 與 $w$ 的連鎖反應")
-st.markdown(f"""
-1. **$x$ 決定了「敏感度」**：嘗試把 `Input (x)` 調到 0。你會發現 Loss 變成一條水平線！這代表不管你怎麼調 `w`，AI 都學不到東西。
-2. **激活函數決定了「地形」**：
+st.markdown(#f"""
+# 1. **$x$ 決定了「敏感度」**：嘗試把 `Input (x)` 調到 0。你會發現 Loss 變成一條水平線！這代表不管你怎麼調 `w`，AI 都學不到東西。
+f"""1. **激活函數決定了「地形」**：
     * 切換到 **Sigmoid**：你會發現兩端變得很平（梯度消失），紅點很難滾動。
     * 切換到 **ReLU**：地形會變得像一個「V」字型的山谷。
-3. **目標點位移**：當你改變 `Target Goal`，你會發現整個山谷（Loss Curve）會在水平方向上位移，AI 必須重新尋找新的最優 `w`。
+2. **目標點位移**：當你改變 `Target Goal`，你會發現整個山谷（Loss Curve）會在水平方向上位移，AI 必須重新尋找新的最優 `w`。
 """)
