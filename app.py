@@ -2,96 +2,89 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- 1. Functions ---
+# --- 1. Activation & Derivatives (Gradients) ---
 def sigmoid(z): return 1 / (1 + np.exp(-z))
+def d_sigmoid(z): s = sigmoid(z); return s * (1 - s)
+
 def relu(z): return np.maximum(0, z)
-def gelu(z): return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * np.power(z, 3))))
+def d_relu(z): return 1.0 if z > 0 else 0.0
 
-# --- 2. Page Config ---
-st.set_page_config(layout="wide", page_title="ANN Loss Explorer")
-st.title("📉 Neural Network Optimization: The Loss Journey")
-st.markdown("How does **Activation** affect the **Loss**? Adjust weights to find the 'Minimum Error' valley.")
+def gelu(z): return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * z**3)))
+def d_gelu(z): return 0.5 * (1 + np.tanh(0.797 * (z + 0.044 * z**3))) # Approximate
 
-# --- 3. Sidebar: Simulation Setup ---
-st.sidebar.header("🕹️ Control Panel")
-input_x = st.sidebar.slider("Input Signal (x)", -5.0, 5.0, 2.0)
-target_y = st.sidebar.slider("Target Goal (y)", -5.0, 5.0, 3.0)
-act_choice = st.sidebar.selectbox("Activation Function", ["ReLU", "Sigmoid", "GeLU"])
+st.set_page_config(layout="wide")
+st.title("🚀 Why Activation Matters: The Gradient Perspective")
 
-st.sidebar.divider()
-st.sidebar.subheader("Adjust Parameters")
-current_w = st.sidebar.slider("Current Weight (w)", -5.0, 5.0, 0.5)
-bias = st.sidebar.slider("Bias (b)", -2.0, 2.0, 0.0)
+# --- 2. Sidebar Control ---
+st.sidebar.header("🕹️ Parameters")
+input_x = st.sidebar.slider("Input Signal (x)", -10.0, 10.0, 4.0)
+target_y = st.sidebar.slider("Target (y)", 0.0, 10.0, 5.0)
+act_choice = st.sidebar.radio("Activation Function", ["Sigmoid", "ReLU", "GeLU"])
 
-# --- 4. Logic & Loss Calculation ---
-def predict(x, w, b, func):
-    z = x * w + b
-    if func == "ReLU": return relu(z)
-    if func == "Sigmoid": return sigmoid(z) * 5 # Scaled for visibility
-    if func == "GeLU": return gelu(z)
-    return 0
+# Current weight for interactive manual iteration
+w = st.sidebar.slider("Current Weight (w)", -5.0, 5.0, 0.5)
 
-# Calculate current state
-y_hat = predict(input_x, current_w, bias, act_choice)
-current_loss = (y_hat - target_y) ** 2
+# --- 3. Forward & Backward Logic ---
+z = input_x * w
+if act_choice == "Sigmoid": 
+    y_hat = sigmoid(z) * 10 # Scale up for demo
+    grad_act = d_sigmoid(z)
+elif act_choice == "ReLU": 
+    y_hat = relu(z)
+    grad_act = d_relu(z)
+else: 
+    y_hat = gelu(z)
+    grad_act = d_gelu(z)
 
-# Calculate Loss Curve over a range of Weights
-w_range = np.linspace(-5, 5, 100)
-loss_range = [(predict(input_x, w_val, bias, act_choice) - target_y) ** 2 for w_val in w_range]
+loss = (y_hat - target_y)**2
+# Total Gradient: dLoss/dw = dLoss/dy * dy/dz * dz/dw
+grad_loss_y = 2 * (y_hat - target_y)
+total_grad = grad_loss_y * grad_act * input_x
 
-# --- 5. Visualization Layout ---
-col1, col2 = st.columns([1, 1])
+# --- 4. Visualization ---
+col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("🕸️ Network Architecture")
-    fig_net, ax_net = plt.subplots(figsize=(6, 5))
-    nodes = {'IN': (0.1, 0.5), 'H1': (0.5, 0.7), 'H2': (0.5, 0.3), 'OUT': (0.9, 0.5)}
+    st.subheader("🌋 Loss Landscape & Slope")
+    w_range = np.linspace(-5, 5, 100)
+    # Re-calculate loss curve based on current settings
+    def get_l(w_val):
+        z_v = input_x * w_val
+        if act_choice == "Sigmoid": y = sigmoid(z_v) * 10
+        elif act_choice == "ReLU": y = relu(z_v)
+        else: y = gelu(z_v)
+        return (y - target_y)**2
     
-    # Draw connections
-    for n in ['H1', 'H2']:
-        lw = abs(current_w) * 2 + 1
-        color = "blue" if current_w > 0 else "red"
-        ax_net.annotate("", xy=nodes[n], xytext=nodes['IN'], 
-                       arrowprops=dict(arrowstyle="->", lw=lw, color=color))
-        ax_net.annotate("", xy=nodes['OUT'], xytext=nodes[n], 
-                       arrowprops=dict(arrowstyle="->", lw=2, color="gray", alpha=0.5))
+    losses = [get_l(wv) for wv in w_range]
     
-    for k, v in nodes.items():
-        ax_net.add_artist(plt.Circle(v, 0.06, color='black', zorder=5))
-        ax_net.text(v[0], v[1]-0.15, k, ha='center', fontweight='bold')
+    fig, ax = plt.subplots()
+    ax.plot(w_range, losses, 'k-', alpha=0.6, label="Loss Path")
+    ax.scatter([w], [loss], color='red', s=100, zorder=5, label="Current Weight")
     
-    ax_net.set_xlim(0, 1); ax_net.set_ylim(0, 1); ax_net.axis('off')
-    st.pyplot(fig_net)
-    st.metric("Final Prediction (y_hat)", f"{y_hat:.2f}")
+    # Draw tangent line (Gradient)
+    slope_x = np.array([w - 0.5, w + 0.5])
+    slope_y = loss + total_grad * (slope_x - w)
+    ax.plot(slope_x, slope_y, 'r--', label="Gradient (Slope)")
+    
+    ax.set_xlabel("Weight (w)")
+    ax.set_ylabel("Loss")
+    ax.legend()
+    st.pyplot(fig)
 
 with col2:
-    st.subheader("🌋 Loss Landscape (The Error Valley)")
-    fig_loss, ax_loss = plt.subplots(figsize=(6, 5))
-    ax_loss.plot(w_range, loss_range, color='black', lw=2, label="Loss Curve")
-    ax_loss.scatter([current_w], [current_loss], color='red', s=150, zorder=5, label="Current Weight")
+    st.subheader("⚡ Training Vitality")
+    st.metric("Current Loss", f"{loss:.4f}")
     
-    ax_loss.set_xlabel("Weight (w)")
-    ax_loss.set_ylabel("Loss (Error)")
-    ax_loss.grid(alpha=0.2)
-    ax_loss.legend()
-    st.pyplot(fig_loss)
+    # 這裡是最重要的視覺化：梯度的大小決定了迭代的速度
+    grad_magnitude = abs(total_grad)
+    st.write("**Gradient Magnitude (Learning Speed):**")
+    st.progress(min(grad_magnitude / 20.0, 1.0))
     
-    st.metric("Current Loss", f"{current_loss:.4f}", delta_color="inverse")
+    if grad_magnitude < 0.01:
+        st.error("⚠️ **Signal Dead (Gradient Vanishing)!** The AI cannot learn from here.")
+    elif grad_magnitude < 0.5:
+        st.warning("🐢 **Learning Slow...** The curve is too flat.")
+    else:
+        st.success("🏎️ **Fast Learning!** The gradient is strong.")
 
-# --- 6. Educational Info ---
-st.divider()
-st.subheader("💡 Why Activation Matters in Training?")
-
-info1, info2, info3 = st.columns(3)
-
-with info1:
-    st.markdown("### **Sigmoid**")
-    st.write("The Loss curve often has flat 'plateaus' (ends). If the red ball lands there, it moves very slowly. This is **Gradient Vanishing**.")
-
-with info2:
-    st.markdown("### **ReLU**")
-    st.write("Creates sharp valleys. It's fast to train, but if the weight goes into the flat zone (0), the neuron **'dies'** and the ball stops moving.")
-
-with info3:
-    st.markdown("### **GeLU**")
-    st.write("A smoother version of ReLU used in **GPT/Transformer**. It provides a better path for the ball to reach the bottom efficiently.")
+    st.write(f"The gradient is **{total_grad:.4f}**. In the next iteration, we update weight by: $w = w - \\eta \\times {total_grad:.2f}$")
