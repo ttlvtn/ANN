@@ -2,122 +2,105 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- 1. Core Mathematical Functions ---
+# --- 1. Functions ---
 def sigmoid(z): return 1 / (1 + np.exp(-z))
 def relu(z): return np.maximum(0, z)
 def gelu(z): return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * np.power(z, 3))))
 
-# Function to calculate gradient (derivative) to show why Sigmoid "dies"
-def get_gradient(z, func_name):
-    if func_name == "Sigmoid":
-        s = sigmoid(z)
-        return s * (1 - s)
-    elif func_name == "ReLU":
-        return 1.0 if z > 0 else 0.0
-    elif func_name == "GeLU":
-        # Simplified GeLU gradient for visualization
-        return 0.5 * (1 + np.tanh(0.797 * (z + 0.044 * z**3)))
-    return 0
+# --- 2. Page Config ---
+st.set_page_config(layout="wide", page_title="ANN Loss Explorer")
+st.title("📉 Neural Network Optimization: The Loss Journey")
+st.markdown("How does **Activation** affect the **Loss**? Adjust weights to find the 'Minimum Error' valley.")
 
-# --- 2. Page Setup ---
-st.set_page_config(layout="wide", page_title="ANN Logic Lab")
-st.title("🔬 ANN Deep Dive: 2x2 Multi-Layer Logic")
-st.markdown("This lab visualizes how signals flow through a **2-Layer / 2-Neuron** network and why **Activation Functions** matter.")
-
-# --- 3. Sidebar: Weight & Bias Control ---
-st.sidebar.header("🕹️ Parameter Control")
-input_x = st.sidebar.slider("Input Signal (x)", -10.0, 10.0, 4.0)
-act_choice = st.sidebar.radio("Switch Activation Function", ["Sigmoid", "ReLU", "GeLU"])
+# --- 3. Sidebar: Simulation Setup ---
+st.sidebar.header("🛠️ Simulation Setup")
+input_x = st.sidebar.slider("Input (x)", -5.0, 5.0, 2.0)
+target_y = st.sidebar.slider("Target Goal (y)", -5.0, 5.0, 3.0)
+act_choice = st.sidebar.selectbox("Activation Function", ["ReLU", "Sigmoid", "GeLU"])
 
 st.sidebar.divider()
-st.sidebar.subheader("Layer 1 Weights (W1)")
-w11 = st.sidebar.slider("w1_1 (to Neuron 1)", -2.0, 2.0, 1.2)
-w12 = st.sidebar.slider("w1_2 (to Neuron 2)", -2.0, 2.0, -0.8)
+st.sidebar.subheader("Adjust Weights (W)")
+# We focus on one key weight to visualize the loss curve
+current_w = st.sidebar.slider("Current Weight (w)", -5.0, 5.0, 0.5)
+bias = st.sidebar.slider("Bias (b)", -2.0, 2.0, 0.0)
 
-st.sidebar.subheader("Layer 2 Weights (W2)")
-w21 = st.sidebar.slider("w2_1 (from N1)", -2.0, 2.0, 1.0)
-w22 = st.sidebar.slider("w2_2 (from N2)", -2.0, 2.0, 0.5)
+# --- 4. Logic & Loss Calculation ---
+def predict(x, w, b, func):
+    z = x * w + b
+    if func == "ReLU": return relu(z)
+    if func == "Sigmoid": return sigmoid(z) * 5 # Scaled for MSE comparison
+    if func == "GeLU": return gelu(z)
+    return 0
 
-# --- 4. Computation Flow ---
-# Layer 1
-z1_1, z1_2 = input_x * w11, input_x * w12
-if act_choice == "Sigmoid": a1_1, a1_2 = sigmoid(z1_1), sigmoid(z1_2)
-elif act_choice == "ReLU": a1_1, a1_2 = relu(z1_1), relu(z1_2)
-else: a1_1, a1_2 = gelu(z1_1), gelu(z1_2)
+# Calculate current state
+y_hat = predict(input_x, current_w, bias, act_choice)
+current_loss = (y_hat - target_y) ** 2
 
-# Layer 2
-z2_1, z2_2 = a1_1 * w21, a1_2 * w22
-if act_choice == "Sigmoid": a2_1, a2_2 = sigmoid(z2_1), sigmoid(z2_2)
-elif act_choice == "ReLU": a2_1, a2_2 = relu(z2_1), relu(z2_2)
-else: a2_1, a2_2 = gelu(z2_1), gelu(z2_2)
+# Calculate Loss Curve over a range of Weights
+w_range = np.linspace(-5, 5, 100)
+loss_range = []
+for w_val in w_range:
+    pred = predict(input_x, w_val, bias, act_choice)
+    loss_range.append((pred - target_y) ** 2)
 
-# Calculate Gradients (Learning Signal)
-grad1 = get_gradient(z1_1, act_choice)
-
-# --- 5. Visualization ---
-col1, col2 = st.columns([3, 2])
+# --- 5. Visualization Layout ---
+col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("🕸️ Network Topology")
-    fig, ax = plt.subplots(figsize=(8, 5))
+    st.subheader("🕸️ 2x2 Network Signal Flow")
+    # Simplify visual for 2x2 architecture showing one active path
+    fig_net, ax_net = plt.subplots(figsize=(6, 5))
+    nodes = {'IN': (0.1, 0.5), 'H1': (0.5, 0.7), 'H2': (0.5, 0.3), 'OUT': (0.9, 0.5)}
     
-    # Node Coordinates
-    pos = {'IN': (0.1, 0.5), 'N1_1': (0.4, 0.75), 'N1_2': (0.4, 0.25), 'N2_1': (0.8, 0.75), 'N2_2': (0.8, 0.25)}
+    # Draw connections
+    for n in ['H1', 'H2']:
+        lw = abs(current_w) * 2 + 1
+        ax_net.annotate("", xy=nodes[n], xytext=nodes['IN'], arrowprops=dict(arrowstyle="->", lw=lw, color="blue" if current_w > 0 else "red"))
+        ax_net.annotate("", xy=nodes['OUT'], xytext=nodes[n], arrowprops=dict(arrowstyle="->", lw=2, color="gray", alpha=0.5))
     
-    # Draw Weights (Lines)
-    def draw_edge(p1, p2, w, label):
-        color = 'blue' if w > 0 else 'red'
-        ax.annotate("", xy=pos[p2], xytext=pos[p1], arrowprops=dict(arrowstyle="->", lw=abs(w)*4+1, color=color, alpha=0.6))
-        ax.text((pos[p1][0]+pos[p2][0])/2, (pos[p1][1]+pos[p2][1])/2 + 0.05, label, fontsize=9, fontweight='bold')
-
-    draw_edge('IN', 'N1_1', w11, f"w={w11}")
-    draw_edge('IN', 'N1_2', w12, f"w={w12}")
-    draw_edge('N1_1', 'N2_1', w21, f"w={w21}")
-    draw_edge('N1_2', 'N2_2', w22, f"w={w22}")
-
-    # Draw Neurons (Circles)
-    for name, p in pos.items():
-        val = a1_1 if name == 'N1_1' else (a1_2 if name == 'N1_2' else (a2_1 if name == 'N2_1' else (a2_2 if name == 'N2_2' else input_x)))
-        color = 'yellow' if val > 0.5 else 'gray'
-        circle = plt.Circle(p, 0.06, color=color, ec='black', zorder=5)
-        ax.add_artist(circle)
-        ax.text(p[0], p[1]-0.15, f"{name}\n(val={val:.2f})", ha='center', fontsize=9)
-
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis('off')
-    st.pyplot(fig)
+    for k, v in nodes.items():
+        ax_net.add_artist(plt.Circle(v, 0.06, color='black', zorder=5))
+        ax_net.text(v[0], v[1]-0.15, k, ha='center', fontweight='bold')
+    
+    ax_net.set_xlim(0, 1); ax_net.set_ylim(0, 1); ax_net.axis('off')
+    st.pyplot(fig_net)
+    
+    st.metric("Final Prediction (y_hat)", f"{y_hat:.2f}")
 
 with col2:
-    st.subheader("📉 Signal Analysis")
+    st.subheader("🌋 Loss Landscape (Error Valley)")
+    fig_loss, ax_loss = plt.subplots(figsize=(6, 5))
+    ax_loss.plot(w_range, loss_range, color='black', lw=2, label="Loss Curve")
+    ax_loss.scatter([current_w], [current_loss], color='red', s=150, zorder=5, label="Your AI State")
     
-    # Metric Display
-    st.write(f"**Current Activation: {act_choice}**")
-    st.metric("Signal Strength at N1_1", f"{a1_1:.4f}")
+    ax_loss.set_xlabel("Weight (w)")
+    ax_loss.set_ylabel("Loss (Error)")
+    ax_loss.set_title(f"Loss Profile using {act_choice}")
+    ax_loss.grid(alpha=0.2)
+    ax_loss.legend()
+    st.pyplot(fig_loss)
     
-    # Gradient Visualization (The "Why" part)
-    st.write("---")
-    st.write("**Learning Potential (Gradient)**")
-    st.progress(min(float(grad1), 1.0))
-    st.caption(f"Gradient Value: {grad1:.4f}")
-    
-    if act_choice == "Sigmoid" and (z1_1 > 4 or z1_1 < -4):
-        st.warning("⚠️ **Gradient Vanishing!** The signal is too flat. AI stops learning.")
-    elif act_choice == "ReLU" and z1_1 <= 0:
-        st.error("💀 **Dead ReLU!** The neuron is inactive. Signal is blocked.")
-    else:
-        st.success("✅ **Healthy Signal!** Information is flowing perfectly.")
+    st.metric("Current Loss", f"{current_loss:.4f}", delta=f"{current_loss:.4f}", delta_color="inverse")
 
-# --- 6. Activation Curve Comparison ---
+# --- 6. Explaining the Difference ---
 st.divider()
-st.subheader("📈 Activation Curve Spotlight")
-z_axis = np.linspace(-10, 10, 200)
-if act_choice == "Sigmoid": y_axis = sigmoid(z_axis)
-elif act_choice == "ReLU": y_axis = relu(z_axis)
-else: y_axis = gelu(z_axis)
+st.subheader("💡 Why the Activation Function changes the 'Map'?")
 
-fig_curve, ax_curve = plt.subplots(figsize=(12, 3))
-ax_curve.plot(z_axis, y_axis, color='navy', lw=2)
-ax_curve.scatter([z1_1], [a1_1], color='red', s=100, label="N1_1 Position")
-ax_curve.axvline(0, color='black', lw=1, alpha=0.3)
-ax_curve.set_title(f"Visualizing {act_choice} Response")
-ax_curve.legend()
-st.pyplot(fig_curve)
+info_col1, info_col2, info_col3 = st.columns(3)
+
+with info_col1:
+    st.markdown("**Sigmoid: The Steep Cliff**")
+    st.write("Notice how the loss curve becomes very flat at the edges. This is why learning is slow—the AI gets stuck on the 'Plateau'.")
+
+
+[Image of Sigmoid function and its derivative]
+
+
+with info_col2:
+    st.markdown("**ReLU: The Sharp Valley**")
+    st.write("The loss curve is often a 'V' shape. It's easy to slide down, but if the weight goes negative, the signal might 'Die' (Loss becomes flat).")
+
+
+with info_col3:
+    st.markdown("**GeLU: The Smooth Path**")
+    st.write("The most advanced choice. It combines the speed of ReLU with a smoother valley, helping the AI find the bottom without jumping out.")
