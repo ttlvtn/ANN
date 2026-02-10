@@ -2,41 +2,85 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# 定義函數
+# Define Activation Functions
 def sigmoid(z): return 1 / (1 + np.exp(-z))
 def relu(z): return np.maximum(0, z)
 def gelu(z): return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * np.power(z, 3))))
 
-st.title("🧪 激活函數實驗室：誰是最好的開關？")
+st.set_page_config(layout="wide")
+st.title("🧠 Neural Network Interactive Lab")
 
-# 側邊欄控制
-z_val = st.slider("調整神經元的輸入值 (z)", -5.0, 5.0, 0.0)
-func_name = st.selectbox("切換函數觀看邏輯", ["Sigmoid", "ReLU", "GeLU"])
+# --- Sidebar: Control Room ---
+st.sidebar.header("🕹️ Control Panel")
+input_x = st.sidebar.slider("Input Signal (x)", 0.0, 10.0, 5.0)
+weight_w = st.sidebar.slider("Weight (w)", -2.0, 2.0, 0.5)
+bias_b = st.sidebar.slider("Bias (b)", -5.0, 5.0, 0.0)
+target_y = st.sidebar.number_input("Target Value (Ground Truth)", value=5.0)
+act_func = st.sidebar.selectbox("Activation Function", ["ReLU", "Sigmoid", "GeLU"])
 
-# 計算數值
-z_range = np.linspace(-5, 5, 200)
-if func_name == "Sigmoid":
-    y_range = sigmoid(z_range)
-    current_y = sigmoid(z_val)
-    desc = "就像一個平滑的 S 型閥門，常用於最後一層判斷『是或不是』。"
-elif func_name == "ReLU":
-    y_range = relu(z_range)
-    current_y = relu(z_val)
-    desc = "最受歡迎的開關！負數直接歸零，正數直接通過，讓學習變快。"
+# --- Core Calculation ---
+z = (input_x * weight_w) + bias_b
+
+if act_func == "ReLU":
+    output_y = relu(z)
+elif act_func == "Sigmoid":
+    output_y = sigmoid(z) * 10 # Scaled for visibility
 else:
-    y_range = gelu(z_range)
-    current_y = gelu(z_val)
-    desc = "ChatGPT 的秘密武器！它是機率性的 ReLU，在 0 附近處理得更細緻。"
+    output_y = gelu(z)
 
-# 繪圖
-fig, ax = plt.subplots()
-ax.plot(z_range, y_range, label=func_name, color='blue', lw=2)
-ax.scatter([z_val], [current_y], color='red', s=100, zorder=5) # 標示當前點
-ax.axhline(0, color='black', lw=1)
-ax.axvline(0, color='black', lw=1)
-ax.set_title(f"{func_name} 曲線與當前輸出")
-ax.grid(alpha=0.3)
-st.pyplot(fig)
+loss = (output_y - target_y) ** 2
 
-st.info(f"**物理意義：** {desc}")
-st.metric(f"{func_name} 輸出強度", f"{current_y:.4f}")
+# --- Layout: Visualization ---
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    st.subheader("🕸️ ANN Architecture")
+    # Using a simple plot to visualize weights
+    fig_net, ax_net = plt.subplots(figsize=(5, 4))
+    ax_net.add_patch(plt.Circle((0.2, 0.5), 0.1, color='skyblue', label='Input'))
+    ax_net.add_patch(plt.Circle((0.8, 0.5), 0.1, color='orange', label='Output'))
+    
+    # Weight Line: thickness depends on weight magnitude
+    line_width = abs(weight_w) * 5 + 1
+    color = 'green' if weight_w > 0 else 'red'
+    ax_net.annotate("", xy=(0.7, 0.5), xytext=(0.3, 0.5),
+                arrowprops=dict(arrowstyle="->", lw=line_width, color=color))
+    
+    ax_net.text(0.1, 0.65, f"Input: {input_x}", fontsize=12)
+    ax_net.text(0.45, 0.55, f"W: {weight_w}", fontsize=12, color=color)
+    ax_net.text(0.7, 0.65, f"Output: {output_y:.2f}", fontsize=12)
+    
+    ax_net.set_xlim(0, 1)
+    ax_net.set_ylim(0, 1)
+    ax_net.axis('off')
+    st.pyplot(fig_net)
+    st.write(f"**Calculation:** $z = {input_x} \\times {weight_w} + {bias_b} = {z:.2f}$")
+
+with col2:
+    st.subheader("📉 Performance Metrics")
+    st.metric(label="Current Prediction (y_hat)", value=f"{output_y:.2f}", delta=f"{output_y - target_y:.2f}")
+    st.metric(label="Loss (Mean Squared Error)", value=f"{loss:.4f}", delta_color="inverse")
+    
+    # Progress bar for Loss
+    st.write("Loss Bar (Goal: 0)")
+    st.progress(min(float(loss/25), 1.0))
+
+    if loss < 0.1:
+        st.balloons()
+        st.success("Perfectly Trained!")
+
+# --- Activation Curve ---
+st.divider()
+st.subheader(f"Function Visualization: {act_func}")
+z_range = np.linspace(-10, 10, 100)
+if act_func == "ReLU": y_range = relu(z_range)
+elif act_func == "Sigmoid": y_range = sigmoid(z_range) * 10
+else: y_range = gelu(z_range)
+
+fig_act, ax_act = plt.subplots(figsize=(10, 3))
+ax_act.plot(z_range, y_range, color='gray', alpha=0.5)
+ax_act.scatter([z], [output_y], color='red', s=100, label='Current State')
+ax_act.set_xlabel("Internal Signal (z)")
+ax_act.set_ylabel("Activated Output")
+ax_act.legend()
+st.pyplot(fig_act)
