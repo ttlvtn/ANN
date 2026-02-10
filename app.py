@@ -2,85 +2,74 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Define Activation Functions
+# --- Activation Functions ---
 def sigmoid(z): return 1 / (1 + np.exp(-z))
 def relu(z): return np.maximum(0, z)
 def gelu(z): return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * np.power(z, 3))))
 
 st.set_page_config(layout="wide")
-st.title("🧠 Neural Network Interactive Lab")
+st.title("🌐 Multi-layer Neural Network Explorer")
 
-# --- Sidebar: Control Room ---
-st.sidebar.header("🕹️ Control Panel")
-input_x = st.sidebar.slider("Input Signal (x)", 0.0, 10.0, 5.0)
-weight_w = st.sidebar.slider("Weight (w)", -2.0, 2.0, 0.5)
-bias_b = st.sidebar.slider("Bias (b)", -5.0, 5.0, 0.0)
-target_y = st.sidebar.number_input("Target Value (Ground Truth)", value=5.0)
-act_func = st.sidebar.selectbox("Activation Function", ["ReLU", "Sigmoid", "GeLU"])
+# --- Sidebar Controls ---
+st.sidebar.header("🛠️ Network Hyperparameters")
+n_layers = st.sidebar.slider("Number of Hidden Layers", 1, 3, 2)
+act_choice = st.sidebar.selectbox("Select Activation Function", ["ReLU", "Sigmoid", "GeLU"])
+input_val = st.sidebar.slider("Input Signal Intensity", -10.0, 10.0, 2.0)
 
-# --- Core Calculation ---
-z = (input_x * weight_w) + bias_b
+# Simulate Weights and Biases for each layer
+weights = [st.sidebar.slider(f"Layer {i+1} Weight", -2.0, 2.0, 0.5) for i in range(n_layers)]
+biases = [st.sidebar.slider(f"Layer {i+1} Bias", -2.0, 2.0, 0.0) for i in range(n_layers)]
 
-if act_func == "ReLU":
-    output_y = relu(z)
-elif act_func == "Sigmoid":
-    output_y = sigmoid(z) * 10 # Scaled for visibility
-else:
-    output_y = gelu(z)
-
-loss = (output_y - target_y) ** 2
-
-# --- Layout: Visualization ---
+# --- Main Simulation ---
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("🕸️ ANN Architecture")
-    # Using a simple plot to visualize weights
-    fig_net, ax_net = plt.subplots(figsize=(5, 4))
-    ax_net.add_patch(plt.Circle((0.2, 0.5), 0.1, color='skyblue', label='Input'))
-    ax_net.add_patch(plt.Circle((0.8, 0.5), 0.1, color='orange', label='Output'))
+    st.subheader("📊 Signal Transformation Flow")
     
-    # Weight Line: thickness depends on weight magnitude
-    line_width = abs(weight_w) * 5 + 1
-    color = 'green' if weight_w > 0 else 'red'
-    ax_net.annotate("", xy=(0.7, 0.5), xytext=(0.3, 0.5),
-                arrowprops=dict(arrowstyle="->", lw=line_width, color=color))
+    current_signal = input_val
+    signals = [input_val]
     
-    ax_net.text(0.1, 0.65, f"Input: {input_x}", fontsize=12)
-    ax_net.text(0.45, 0.55, f"W: {weight_w}", fontsize=12, color=color)
-    ax_net.text(0.7, 0.65, f"Output: {output_y:.2f}", fontsize=12)
+    for i in range(n_layers):
+        # Linear transform
+        z = current_signal * weights[i] + biases[i]
+        # Activation
+        if act_choice == "ReLU": current_signal = relu(z)
+        elif act_choice == "Sigmoid": current_signal = sigmoid(z) * 10 # Scaled for visibility
+        else: current_signal = gelu(z)
+        signals.append(current_signal)
     
-    ax_net.set_xlim(0, 1)
-    ax_net.set_ylim(0, 1)
-    ax_net.axis('off')
-    st.pyplot(fig_net)
-    st.write(f"**Calculation:** $z = {input_x} \\times {weight_w} + {bias_b} = {z:.2f}$")
+    # Plotting the signal change across layers
+    fig, ax = plt.subplots()
+    layer_names = ["Input"] + [f"Hidden {i+1}" for i in range(n_layers)]
+    ax.plot(layer_names, signals, marker='o', linestyle='-', color='blue', lw=2)
+    ax.set_ylabel("Signal Strength")
+    ax.set_title(f"How Signal Changes (Activation: {act_choice})")
+    for i, txt in enumerate(signals):
+        ax.annotate(f"{txt:.2f}", (layer_names[i], signals[i]), textcoords="offset points", xytext=(0,10), ha='center')
+    st.pyplot(fig)
 
 with col2:
-    st.subheader("📉 Performance Metrics")
-    st.metric(label="Current Prediction (y_hat)", value=f"{output_y:.2f}", delta=f"{output_y - target_y:.2f}")
-    st.metric(label="Loss (Mean Squared Error)", value=f"{loss:.4f}", delta_color="inverse")
+    st.subheader("📈 Activation Effect: The 'Shape' of Logic")
+    z_range = np.linspace(-10, 10, 200)
     
-    # Progress bar for Loss
-    st.write("Loss Bar (Goal: 0)")
-    st.progress(min(float(loss/25), 1.0))
+    if act_choice == "ReLU": y_plot = relu(z_range)
+    elif act_choice == "Sigmoid": y_plot = sigmoid(z_range) * 10
+    else: y_plot = gelu(z_range)
+    
+    fig2, ax2 = plt.subplots()
+    ax2.plot(z_range, y_plot, label=act_choice, color='green', lw=3)
+    # Mark the signal state of the LAST layer
+    last_z = signals[-2] * weights[-1] + biases[-1]
+    ax2.scatter([last_z], [signals[-1]], color='red', s=100, zorder=5, label='Last Layer State')
+    ax2.axhline(0, color='black', alpha=0.3)
+    ax2.axvline(0, color='black', alpha=0.3)
+    ax2.set_xlabel("Internal Sum (z)")
+    ax2.set_ylabel("Activated Output")
+    ax2.legend()
+    st.pyplot(fig2)
 
-    if loss < 0.1:
-        st.balloons()
-        st.success("Perfectly Trained!")
-
-# --- Activation Curve ---
+# --- Final Loss Calculation ---
 st.divider()
-st.subheader(f"Function Visualization: {act_func}")
-z_range = np.linspace(-10, 10, 100)
-if act_func == "ReLU": y_range = relu(z_range)
-elif act_func == "Sigmoid": y_range = sigmoid(z_range) * 10
-else: y_range = gelu(z_range)
-
-fig_act, ax_act = plt.subplots(figsize=(10, 3))
-ax_act.plot(z_range, y_range, color='gray', alpha=0.5)
-ax_act.scatter([z], [output_y], color='red', s=100, label='Current State')
-ax_act.set_xlabel("Internal Signal (z)")
-ax_act.set_ylabel("Activated Output")
-ax_act.legend()
-st.pyplot(fig_act)
+target = st.number_input("Desired Target Value", value=8.0)
+final_loss = (signals[-1] - target) ** 2
+st.metric("Final Model Loss", f"{final_loss:.4f}")
