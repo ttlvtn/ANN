@@ -2,92 +2,85 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- 1. Activation Functions & Their Logic ---
+# --- 1. Activation Functions ---
 def sigmoid(z): return 1 / (1 + np.exp(-z))
 def relu(z): return np.maximum(0, z)
 def gelu(z): return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * z**3)))
 
 st.set_page_config(layout="wide")
-st.title("🔬 ANN Signal & Loss Lab (Interactive)")
+st.title("🔬 ANN Signal & Loss Lab: The Mapping of W, X, and Loss")
 
 # --- 2. Sidebar: Manual Input Control ---
 st.sidebar.header("📥 Data Input Center")
-# 讓學生可以手動輸入任何數字
 user_input = st.sidebar.number_input("Enter Input Signal (x)", value=2.0, step=0.1)
 target_goal = st.sidebar.number_input("Enter Target Goal (y)", value=5.0, step=0.1)
 
 st.sidebar.divider()
 st.sidebar.subheader("Adjustable Parameters")
-w = st.sidebar.slider("Weight (w)", -5.0, 5.0, 1.5)
-b = st.sidebar.slider("Bias (b)", -5.0, 5.0, 0.0)
+w_current = st.sidebar.slider("Current Weight (w)", -10.0, 10.0, 1.5)
+bias = st.sidebar.slider("Bias (b)", -5.0, 5.0, 0.0)
+act_choice = st.sidebar.selectbox("Select Activation for Loss Curve", ["ReLU", "Sigmoid", "GeLU"])
 
 # --- 3. Processing Logic ---
-z = (user_input * w) + b
+z_current = (user_input * w_current) + bias
 
-# 計算三種函數的輸出
-out_sigmoid = sigmoid(z) * 10  # 縮放以便與目標比較
-out_relu = relu(z)
-out_gelu = gelu(z)
+def get_output(z_val, mode):
+    if mode == "Sigmoid": return sigmoid(z_val) * 10
+    if mode == "ReLU": return relu(z_val)
+    if mode == "GeLU": return gelu(z_val)
+    return 0
 
-# 計算 Loss (MSE)
-loss_s = (out_sigmoid - target_goal)**2
-loss_r = (out_relu - target_goal)**2
-loss_g = (out_gelu - target_goal)**2
+out_current = get_output(z_current, act_choice)
+loss_current = (out_current - target_goal)**2
 
-# --- 4. Visualization Layout ---
-# 第一列：數值儀表板
-c1, c2, c3 = st.columns(3)
-c1.metric("Internal Sum (z)", f"{z:.2f}")
-c2.metric("Target Goal", f"{target_goal:.2f}")
-c3.info(f"Activation Choice Affects the Output Shape")
+# --- 4. Loss Surface Calculation (Loss vs Weight) ---
+# 我們想看：當 x 固定，改變 w 時，Loss 怎麼變？
+w_range = np.linspace(-10, 10, 200)
+z_range = (user_input * w_range) + bias
+loss_range = [(get_output(zv, act_choice) - target_goal)**2 for zv in z_range]
 
-# 第二列：三大激活函數的對比呈現
+# --- 5. Visualization ---
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    st.subheader(f"📈 Loss Curve: $Loss$ vs $w$ (given $x={user_input}$)")
+    fig_loss, ax_loss = plt.subplots(figsize=(6, 4))
+    ax_loss.plot(w_range, loss_range, color='black', lw=2, label=f'Loss Landscape ({act_choice})')
+    ax_loss.scatter([w_current], [loss_current], color='red', s=100, zorder=5, label='Current AI State')
+    
+    # 標示最低點（AI 的目標）
+    min_loss_w = w_range[np.argmin(loss_range)]
+    ax_loss.axvline(min_loss_w, color='green', linestyle='--', alpha=0.5, label='Target Minimum')
+    
+    ax_loss.set_xlabel("Weight (w)")
+    ax_loss.set_ylabel("Loss (Error)")
+    ax_loss.legend()
+    st.pyplot(fig_loss)
+    
+    st.info(f"💡 **AI 的任務**：調整 **w** 讓紅點滾到綠色虛線（最低點）。")
+
+with col2:
+    st.subheader("📊 Mathematical Breakdown")
+    st.write(f"**Current Formula:**")
+    st.latex(rf"Loss = (\text{{{act_choice}}}({w_current} \cdot {user_input} + {bias}) - {target_goal})^2")
+    
+    st.metric("Final Loss", f"{loss_current:.4f}")
+    
+    # 解釋 x 的影響
+    st.write("---")
+    st.write("**$x$ (Input) 的角色：**")
+    if abs(user_input) > 1:
+        st.write(f"現在 $x={user_input}$，這會**放大** Weight 的影響力，讓 Loss 曲線變得更陡峭。")
+    else:
+        st.write(f"現在 $x={user_input}$ 較小，這會**縮小** Weight 的影響力，讓 Loss 曲線變得平緩。")
+
+# --- 6. 互動總結 ---
 st.divider()
-st.subheader("⚡ Activation Comparison: How they handle your input")
-
-col_s, col_r, col_g = st.columns(3)
-
-with col_s:
-    st.write("### Sigmoid (The S-Curve)")
-    st.write(f"Output: **{out_sigmoid:.4f}**")
-    st.error(f"Loss: {loss_s:.4f}")
-    # 畫小圖
-    fig_s, ax_s = plt.subplots(figsize=(4,3))
-    zr = np.linspace(-10, 10, 100)
-    ax_s.plot(zr, sigmoid(zr)*10, color='blue')
-    ax_s.scatter([z], [out_sigmoid], color='red')
-    ax_s.set_title("Soft & Saturated")
-    st.pyplot(fig_s)
-
-with col_r:
-    st.write("### ReLU (The Hard Filter)")
-    st.write(f"Output: **{out_relu:.4f}**")
-    st.error(f"Loss: {loss_r:.4f}")
-    fig_r, ax_r = plt.subplots(figsize=(4,3))
-    ax_r.plot(zr, relu(zr), color='orange')
-    ax_r.scatter([z], [out_relu], color='red')
-    ax_r.set_title("Direct & Fast")
-    st.pyplot(fig_r)
-
-with col_g:
-    st.write("### GeLU (The Smooth Gate)")
-    st.write(f"Output: **{out_gelu:.4f}**")
-    st.error(f"Loss: {loss_g:.4f}")
-    fig_g, ax_g = plt.subplots(figsize=(4,3))
-    ax_g.plot(zr, gelu(zr), color='green')
-    ax_g.scatter([z], [out_gelu], color='red')
-    ax_g.set_title("Smart & Balanced")
-    st.pyplot(fig_g)
-
-# --- 5. Summary Analysis ---
-st.divider()
-st.subheader("📝 Lab Report")
-best_act = "Sigmoid" if loss_s < loss_r and loss_s < loss_g else ("ReLU" if loss_r < loss_g else "GeLU")
-st.success(f"With current input and weight, **{best_act}** provides the lowest Loss!")
-
-st.markdown("""
-### 如何引導學生觀察？
-1. **輸入負數**：讓學生輸入 `Input = -5`。他們會發現 **ReLU** 變成了 0 (Dead)，而 **GeLU** 在 0 附近還有一點起伏，**Sigmoid** 則是趨近於 0 但沒死掉。
-2. **調整權重至極端**：讓 `w` 很大。觀察 **Sigmoid** 的紅點是否卡在最頂端（這就是梯度消失，它再也動不了了）。
-3. **對齊目標**：嘗試調整 `w` 和 `b`，看看哪一個函數能讓你最容易達到 **Target Goal**。
+st.subheader("📝 觀察重點：$x$ 與 $w$ 的連鎖反應")
+st.markdown(f"""
+1. **$x$ 決定了「敏感度」**：嘗試把 `Input (x)` 調到 0。你會發現 Loss 變成一條水平線！這代表不管你怎麼調 `w`，AI 都學不到東西。
+2. **激活函數決定了「地形」**：
+    * 切換到 **Sigmoid**：你會發現兩端變得很平（梯度消失），紅點很難滾動。
+    * 切換到 **ReLU**：地形會變得像一個「V」字型的山谷。
+3. **目標點位移**：當你改變 `Target Goal`，你會發現整個山谷（Loss Curve）會在水平方向上位移，AI 必須重新尋找新的最優 `w`。
 """)
