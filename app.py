@@ -1,123 +1,123 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 
-# --- 1. Activation Functions Definition ---
+# --- 1. Core Mathematical Functions ---
 def sigmoid(z): return 1 / (1 + np.exp(-z))
 def relu(z): return np.maximum(0, z)
 def gelu(z): return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * np.power(z, 3))))
 
-# --- 2. Page Configuration ---
-st.set_page_config(layout="wide", page_title="ANN Multi-Layer Lab")
-st.title("🌐 Multi-Layer Neural Network: Visual Logic Lab")
-st.markdown("""
-This lab demonstrates how an **Artificial Neural Network (ANN)** processes signals through multiple layers and neurons. 
-Adjust the weights and observe how different **Activation Functions** shape the 'brain's' response.
-""")
+# Function to calculate gradient (derivative) to show why Sigmoid "dies"
+def get_gradient(z, func_name):
+    if func_name == "Sigmoid":
+        s = sigmoid(z)
+        return s * (1 - s)
+    elif func_name == "ReLU":
+        return 1.0 if z > 0 else 0.0
+    elif func_name == "GeLU":
+        # Simplified GeLU gradient for visualization
+        return 0.5 * (1 + np.tanh(0.797 * (z + 0.044 * z**3)))
+    return 0
 
-# --- 3. Sidebar: Architecture & Hyperparameters ---
-st.sidebar.header("🏗️ Network Configuration")
-st.sidebar.subheader("Layer Settings")
-n_hidden_layers = st.sidebar.slider("Number of Hidden Layers", 1, 3, 2)
-neurons_per_layer = st.sidebar.slider("Neurons per Layer (Width)", 2, 8, 4)
+# --- 2. Page Setup ---
+st.set_page_config(layout="wide", page_title="ANN Logic Lab")
+st.title("🔬 ANN Deep Dive: 2x2 Multi-Layer Logic")
+st.markdown("This lab visualizes how signals flow through a **2-Layer / 2-Neuron** network and why **Activation Functions** matter.")
 
-st.sidebar.divider()
-st.sidebar.subheader("Signal Input")
-input_vector = st.sidebar.multiselect(
-    "Input Signals (Select up to 4)", 
-    ["Feature A", "Feature B", "Feature C", "Feature D"],
-    default=["Feature A", "Feature B"]
-)
-# Convert selected features to a numeric vector
-raw_input = np.zeros(neurons_per_layer)
-for i in range(len(input_vector)):
-    raw_input[i] = st.sidebar.slider(f"Intensity of {input_vector[i]}", -5.0, 5.0, 1.0)
+# --- 3. Sidebar: Weight & Bias Control ---
+st.sidebar.header("🕹️ Parameter Control")
+input_x = st.sidebar.slider("Input Signal (x)", -10.0, 10.0, 4.0)
+act_choice = st.sidebar.radio("Switch Activation Function", ["Sigmoid", "ReLU", "GeLU"])
 
 st.sidebar.divider()
-st.sidebar.subheader("Decision Logic")
-act_choice = st.sidebar.selectbox("Activation Function", ["ReLU", "Sigmoid", "GeLU"])
+st.sidebar.subheader("Layer 1 Weights (W1)")
+w11 = st.sidebar.slider("w1_1 (to Neuron 1)", -2.0, 2.0, 1.2)
+w12 = st.sidebar.slider("w1_2 (to Neuron 2)", -2.0, 2.0, -0.8)
 
-# --- 4. Core Computation (Forward Propagation) ---
-# We store outputs of each layer for visualization
-layer_outputs = [raw_input]
-current_input = raw_input
+st.sidebar.subheader("Layer 2 Weights (W2)")
+w21 = st.sidebar.slider("w2_1 (from N1)", -2.0, 2.0, 1.0)
+w22 = st.sidebar.slider("w2_2 (from N2)", -2.0, 2.0, 0.5)
 
-# Generate stable random weights for demonstration based on seed
-np.random.seed(42)
+# --- 4. Computation Flow ---
+# Layer 1
+z1_1, z1_2 = input_x * w11, input_x * w12
+if act_choice == "Sigmoid": a1_1, a1_2 = sigmoid(z1_1), sigmoid(z1_2)
+elif act_choice == "ReLU": a1_1, a1_2 = relu(z1_1), relu(z1_2)
+else: a1_1, a1_2 = gelu(z1_1), gelu(z1_2)
 
-for i in range(n_hidden_layers):
-    # Matrix Weight (Shape: Neurons x Neurons)
-    W = np.random.randn(neurons_per_layer, neurons_per_layer) * 0.5
-    b = np.random.randn(neurons_per_layer) * 0.1
-    
-    # Linear Transformation: Z = WX + B
-    z = np.dot(W, current_input) + b
-    
-    # Non-linear Activation
-    if act_choice == "ReLU":
-        current_input = relu(z)
-    elif act_choice == "Sigmoid":
-        current_input = sigmoid(z) * 5 # Scale for visualization
-    else:
-        current_input = gelu(z)
-    
-    layer_outputs.append(current_input)
+# Layer 2
+z2_1, z2_2 = a1_1 * w21, a1_2 * w22
+if act_choice == "Sigmoid": a2_1, a2_2 = sigmoid(z2_1), sigmoid(z2_2)
+elif act_choice == "ReLU": a2_1, a2_2 = relu(z2_1), relu(z2_2)
+else: a2_1, a2_2 = gelu(z2_1), gelu(z2_2)
 
-# Final Output (Average of last layer)
-final_prediction = np.mean(layer_outputs[-1])
+# Calculate Gradients (Learning Signal)
+grad1 = get_gradient(z1_1, act_choice)
 
-# --- 5. Visualization Layout ---
+# --- 5. Visualization ---
 col1, col2 = st.columns([3, 2])
 
 with col1:
-    st.subheader("🕸️ Network Structure & Signal Flow")
-    fig_net, ax_net = plt.subplots(figsize=(10, 6))
+    st.subheader("🕸️ Network Topology")
+    fig, ax = plt.subplots(figsize=(8, 5))
     
-    # Draw neurons and connections
-    layer_sizes = [neurons_per_layer] * (n_hidden_layers + 1)
-    v_spacing = 1.0 / max(layer_sizes)
-    h_spacing = 1.0 / len(layer_sizes)
+    # Node Coordinates
+    pos = {'IN': (0.1, 0.5), 'N1_1': (0.4, 0.75), 'N1_2': (0.4, 0.25), 'N2_1': (0.8, 0.75), 'N2_2': (0.8, 0.25)}
     
-    for l, layer_size in enumerate(layer_sizes):
-        for i in range(layer_size):
-            # Neuron color based on activation value
-            val = layer_outputs[l][i]
-            color = plt.cm.viridis(val / 5.0) if val > 0 else 'black'
-            circle = plt.Circle((l * h_spacing + 0.1, i * v_spacing + 0.1), 0.03, color=color, ec='white', zorder=4)
-            ax_net.add_artist(circle)
-            
-            # Draw connections to next layer
-            if l < len(layer_sizes) - 1:
-                for j in range(layer_sizes[l+1]):
-                    ax_net.plot([l * h_spacing + 0.1, (l+1) * h_spacing + 0.1], 
-                                [i * v_spacing + 0.1, j * v_spacing + 0.1], 
-                                color='gray', alpha=0.2, lw=1)
-    
-    ax_net.set_axis_off()
-    st.pyplot(fig_net)
-    st.caption("Bright colors = Firing Neurons | Black = Inactive (Dead) Neurons")
+    # Draw Weights (Lines)
+    def draw_edge(p1, p2, w, label):
+        color = 'blue' if w > 0 else 'red'
+        ax.annotate("", xy=pos[p2], xytext=pos[p1], arrowprops=dict(arrowstyle="->", lw=abs(w)*4+1, color=color, alpha=0.6))
+        ax.text((pos[p1][0]+pos[p2][0])/2, (pos[p1][1]+pos[p2][1])/2 + 0.05, label, fontsize=9, fontweight='bold')
+
+    draw_edge('IN', 'N1_1', w11, f"w={w11}")
+    draw_edge('IN', 'N1_2', w12, f"w={w12}")
+    draw_edge('N1_1', 'N2_1', w21, f"w={w21}")
+    draw_edge('N1_2', 'N2_2', w22, f"w={w22}")
+
+    # Draw Neurons (Circles)
+    for name, p in pos.items():
+        val = a1_1 if name == 'N1_1' else (a1_2 if name == 'N1_2' else (a2_1 if name == 'N2_1' else (a2_2 if name == 'N2_2' else input_x)))
+        color = 'yellow' if val > 0.5 else 'gray'
+        circle = plt.Circle(p, 0.06, color=color, ec='black', zorder=5)
+        ax.add_artist(circle)
+        ax.text(p[0], p[1]-0.15, f"{name}\n(val={val:.2f})", ha='center', fontsize=9)
+
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis('off')
+    st.pyplot(fig)
 
 with col2:
-    st.subheader("🔥 Layer Activity (Heatmap)")
-    # Prepare data for Heatmap
-    heatmap_data = np.array(layer_outputs).T
-    fig_hm, ax_hm = plt.subplots()
-    sns.heatmap(heatmap_data, annot=True, fmt=".2f", cmap="YlGnBu", ax=ax_hm)
-    ax_hm.set_xticklabels(["Input"] + [f"Hidden {i+1}" for i in range(n_hidden_layers)])
-    ax_hm.set_ylabel("Neuron Index")
-    st.pyplot(fig_hm)
-    st.info(f"**Insight:** Notice how **{act_choice}** turns some neurons to 0.00 (Sparsity).")
+    st.subheader("📉 Signal Analysis")
+    
+    # Metric Display
+    st.write(f"**Current Activation: {act_choice}**")
+    st.metric("Signal Strength at N1_1", f"{a1_1:.4f}")
+    
+    # Gradient Visualization (The "Why" part)
+    st.write("---")
+    st.write("**Learning Potential (Gradient)**")
+    st.progress(min(float(grad1), 1.0))
+    st.caption(f"Gradient Value: {grad1:.4f}")
+    
+    if act_choice == "Sigmoid" and (z1_1 > 4 or z1_1 < -4):
+        st.warning("⚠️ **Gradient Vanishing!** The signal is too flat. AI stops learning.")
+    elif act_choice == "ReLU" and z1_1 <= 0:
+        st.error("💀 **Dead ReLU!** The neuron is inactive. Signal is blocked.")
+    else:
+        st.success("✅ **Healthy Signal!** Information is flowing perfectly.")
 
-# --- 6. Loss & Performance ---
+# --- 6. Activation Curve Comparison ---
 st.divider()
-c1, c2, c3 = st.columns(3)
-target_val = c1.number_input("Target Value (Ground Truth)", value=3.0)
-loss = (final_prediction - target_val)**2
+st.subheader("📈 Activation Curve Spotlight")
+z_axis = np.linspace(-10, 10, 200)
+if act_choice == "Sigmoid": y_axis = sigmoid(z_axis)
+elif act_choice == "ReLU": y_axis = relu(z_axis)
+else: y_axis = gelu(z_axis)
 
-c2.metric("Final Prediction (ŷ)", f"{final_prediction:.4f}")
-c3.metric("Loss (Error Rate)", f"{loss:.4f}", delta=f"{final_prediction - target_val:.2f}", delta_color="inverse")
-
-if loss < 0.5:
-    st.balloons()
-    st.success("Target Reached! The network has 'learned' the pattern.")
+fig_curve, ax_curve = plt.subplots(figsize=(12, 3))
+ax_curve.plot(z_axis, y_axis, color='navy', lw=2)
+ax_curve.scatter([z1_1], [a1_1], color='red', s=100, label="N1_1 Position")
+ax_curve.axvline(0, color='black', lw=1, alpha=0.3)
+ax_curve.set_title(f"Visualizing {act_choice} Response")
+ax_curve.legend()
+st.pyplot(fig_curve)
