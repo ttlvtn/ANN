@@ -1,37 +1,42 @@
 import streamlit as st
 import numpy as np
+import matplotlib.pyplot as plt
 
-st.title("🧠 ANN 運作模擬器（高中生入門版）")
+# 定義函數
+def sigmoid(z): return 1 / (1 + np.exp(-z))
+def relu(z): return np.maximum(0, z)
+def gelu(z): return 0.5 * z * (1 + np.tanh(np.sqrt(2 / np.pi) * (z + 0.044715 * np.power(z, 3))))
 
-# --- Step 1: 輸入 ---
-x = st.slider("輸入數據 (例如: 你的讀書時間)", 0.0, 10.0, 5.0)
+st.title("🧪 激活函數實驗室：誰是最好的開關？")
 
-# --- Step 2: 權重 ---
-w = st.sidebar.slider("調整權重 (Weight)", -2.0, 2.0, 0.8)
-b = st.sidebar.slider("調整偏差 (Bias)", -5.0, 5.0, 0.0)
+# 側邊欄控制
+z_val = st.slider("調整神經元的輸入值 (z)", -5.0, 5.0, 0.0)
+func_name = st.selectbox("切換函數觀看邏輯", ["Sigmoid", "ReLU", "GeLU"])
 
-# 計算線性結果
-z = w * x + b
-st.write(f"加權計算後的數值 (z) = {z:.2f}")
-
-# --- Step 3: 激活函數 ---
-activation_type = st.radio("選擇激活函數", ["ReLU", "Sigmoid"])
-if activation_type == "ReLU":
-    output = max(0, z)
+# 計算數值
+z_range = np.linspace(-5, 5, 200)
+if func_name == "Sigmoid":
+    y_range = sigmoid(z_range)
+    current_y = sigmoid(z_val)
+    desc = "就像一個平滑的 S 型閥門，常用於最後一層判斷『是或不是』。"
+elif func_name == "ReLU":
+    y_range = relu(z_range)
+    current_y = relu(z_val)
+    desc = "最受歡迎的開關！負數直接歸零，正數直接通過，讓學習變快。"
 else:
-    output = 1 / (1 + np.exp(-z))
+    y_range = gelu(z_range)
+    current_y = gelu(z_val)
+    desc = "ChatGPT 的秘密武器！它是機率性的 ReLU，在 0 附近處理得更細緻。"
 
-st.metric("AI 的最終輸出 (y_pred)", f"{output:.2f}")
+# 繪圖
+fig, ax = plt.subplots()
+ax.plot(z_range, y_range, label=func_name, color='blue', lw=2)
+ax.scatter([z_val], [current_y], color='red', s=100, zorder=5) # 標示當前點
+ax.axhline(0, color='black', lw=1)
+ax.axvline(0, color='black', lw=1)
+ax.set_title(f"{func_name} 曲線與當前輸出")
+ax.grid(alpha=0.3)
+st.pyplot(fig)
 
-# --- Step 4: Loss 計算 ---
-target = 5.0  # 假設標準答案是 5
-loss = (output - target) ** 2
-
-st.subheader("📊 準確度分析 (Loss)")
-if loss < 1:
-    st.success(f"目前 Loss: {loss:.4f} (預測得很準！)")
-else:
-    st.error(f"目前 Loss: {loss:.4f} (失誤很大，請回去調整權重！)")
-
-# 繪製 Loss 變化圖
-st.write("目標是讓 Loss 歸零，這就是 AI 訓練的目的！")
+st.info(f"**物理意義：** {desc}")
+st.metric(f"{func_name} 輸出強度", f"{current_y:.4f}")
